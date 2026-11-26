@@ -906,13 +906,13 @@ custom_css = """
 }
 
 .panel {
-    border-radius: 14px !important;
-    padding: 18px !important;
+    border-radius: 14px;
+    padding: 18px ;
 }
 
 #analyze-btn {
     min-height: 48px;
-    font-weight: 100;
+    font-weight: 80;
 }
 
 #clear-btn {
