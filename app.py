@@ -926,7 +926,8 @@ custom_css = """
     margin-top: 20px;
 }
 #developer {
-font-weight: 750;
+font-size: 20px;
+font-weight: 950;
 
 }
 """
