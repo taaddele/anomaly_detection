@@ -1078,7 +1078,7 @@ with gr.Blocks(
         CNN–Transformer CI/CD Log Classification Research Project
         </div>
         <div class="footer-note">
-        Developed By: Taddele Petros (Software Engineer)
+        <P style=bold>Developed By: Taddele Petros (Software Engineer)</p>
         </div>
         """,
         elem_classes="footer-note"
