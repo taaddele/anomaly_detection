@@ -912,7 +912,7 @@ custom_css = """
 
 #analyze-btn {
     min-height: 48px;
-    font-weight: bold;
+    font-weight: 150;
 }
 
 #clear-btn {
@@ -926,7 +926,7 @@ custom_css = """
     margin-top: 20px;
 }
 #developer {
-font-style: bold;
+font-weight: 750;
 
 }
 """
