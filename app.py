@@ -34,7 +34,7 @@ except RuntimeError:
 # Render Free Web Services use CPU inference.
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "gha_log_transformer_model.pt"
+MODEL_PATH = BASE_DIR / "gha_log_cnn_bilstm_model.pt"
 VOCAB_PATH = BASE_DIR / "char_vocab.json"
 PAD_ID, UNK_ID = 0, 1
 
