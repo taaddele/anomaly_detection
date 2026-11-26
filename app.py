@@ -912,11 +912,12 @@ custom_css = """
 
 #analyze-btn {
     min-height: 48px;
-    font-weight: 150;
+    font-weight: 100;
 }
 
 #clear-btn {
     min-height: 48px;
+    font-weight: 50
 }
 
 .footer-note {
