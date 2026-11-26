@@ -878,46 +878,209 @@ def analyze_uploaded_or_pasted_log(pasted_text, uploaded_file):
         return [], f"**Unable to analyze this input:** {type(exc).__name__}: {exc}"
 
 
-with gr.Blocks(title="CI/CD Workflow Log Anomaly Classifier") as demo:
+
+# ---------------------------------------------------------
+# PROFESSIONAL GRADIO INTERFACE
+# ---------------------------------------------------------
+
+custom_css = """
+.gradio-container {
+    max-width: 1250px !important;
+    margin: auto !important;
+}
+
+#main-header {
+    text-align: center;
+    padding: 28px 20px;
+    border-radius: 14px;
+    margin-bottom: 18px;
+}
+
+#main-header h1 {
+    font-size: 30px;
+    font-weight: 750;
+}
+
+#main-header p {
+    font-size: 15px;
+}
+
+.panel {
+    border-radius: 14px !important;
+    padding: 18px !important;
+}
+
+#analyze-btn {
+    min-height: 48px;
+    font-weight: bold;
+}
+
+#clear-btn {
+    min-height: 48px;
+}
+
+.footer-note {
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.75;
+    margin-top: 20px;
+}
+"""
+
+with gr.Blocks(
+    theme=gr.themes.Soft(
+        primary_hue="blue",
+        secondary_hue="slate",
+        neutral_hue="slate"
+    ),
+    css=custom_css,
+    title="CI/CD Intelligent Log Analyzer"
+) as demo:
+
+    # Header
     gr.Markdown(
-        "# CI/CD Workflow Log Anomaly Classifier\n"
-        "Paste a GitHub Actions/CI log or upload a `.txt` file. The model classifies "
-        "retained log lines as Normal, Flaky test, Configuration drift, Security anomaly, "
-        "or Silent failure. Predictions use neighbouring log lines as context."
+        """
+        # CI/CD Intelligent Log Analyzer
+
+        **CNN–Transformer Based Log Classification System**
+
+        Analyze continuous integration and continuous
+        deployment logs to identify normal behavior,
+        flaky tests, configuration drift, security anomalies,
+        and silent failures.
+        """,
+        elem_id="main-header"
     )
+
+    gr.Markdown("## 1. Upload or enter your workflow logs")
+
     with gr.Row():
-        pasted_input = gr.Textbox(
-            label="Paste workflow log text",
-            placeholder="Run npm test\nError: expected status 200, received 500\nBuild failed",
-            lines=16,
-            scale=2,
+
+        with gr.Column(scale=2, elem_classes="panel"):
+            pasted_input = gr.Textbox(
+                label="Paste CI/CD workflow logs",
+                placeholder=(
+                    "Initialize workflow\n"
+                    "Installing dependencies\n"
+                    "Running unit tests\n"
+                    "Error: Connection timeout\n"
+                    "Build failed"
+                ),
+                lines=16
+            )
+
+        with gr.Column(scale=1, elem_classes="panel"):
+            file_input = gr.File(
+                label="Upload log file (.txt)",
+                file_types=[".txt"],
+                type="filepath"
+            )
+
+            gr.Markdown(
+                """
+                **Supported input**
+
+                - GitHub Actions logs
+                - CI/CD workflow logs
+                - Plain-text `.txt` files
+
+                Uploaded files take priority over pasted text.
+                """
+            )
+
+    with gr.Row():
+        analyze_button = gr.Button(
+            "Analyze workflow logs",
+            variant="primary",
+            elem_id="analyze-btn"
         )
-        file_input = gr.File(
-            label="Or upload a .txt log file (takes precedence)",
-            file_types=[".txt"],
-            type="filepath",
-            scale=1,
+
+        clear_button = gr.Button(
+            "Clear",
+            variant="secondary",
+            elem_id="clear-btn"
         )
-    analyze_button = gr.Button("Analyze log", variant="primary")
+
+    gr.Markdown("---")
+
+    gr.Markdown("## 2. Classification results")
+
+    summary_output = gr.Markdown(
+        label="Analysis summary"
+    )
+
     output_table = gr.Dataframe(
-        headers=["Input line #", "Predicted class", "Top score (%)", "Decision", "Cleaned log text"],
-        datatype=["number", "str", "number", "str", "str"],
-        label="Line-by-line predictions",
+        headers=[
+            "Input line #",
+            "Predicted class",
+            "Top score (%)",
+            "Decision",
+            "Cleaned log text"
+        ],
+        datatype=[
+            "number",
+            "str",
+            "number",
+            "str",
+            "str"
+        ],
+        label="Line-by-line classification",
         interactive=False,
-        wrap=True,
+        wrap=True
     )
-    summary_output = gr.Markdown(label="Summary")
-    gr.Markdown(
-        "### Important notes\n"
-        "- The displayed score is not a calibrated probability.\n"
-        "- A predicted anomaly is a review signal, not proof of a security incident or failure.\n"
-        "- Do not paste access tokens, passwords, private keys, or other sensitive log content into a public demo."
-    )
+
+    # Existing trained-model prediction callback
     analyze_button.click(
         fn=analyze_uploaded_or_pasted_log,
         inputs=[pasted_input, file_input],
-        outputs=[output_table, summary_output],
+        outputs=[output_table, summary_output]
     )
+
+    # Clear input and previous results
+    clear_button.click(
+        fn=lambda: ("", None, [], ""),
+        inputs=[],
+        outputs=[
+            pasted_input,
+            file_input,
+            output_table,
+            summary_output
+        ]
+    )
+
+    with gr.Accordion(
+        "About the classification system",
+        open=False
+    ):
+        gr.Markdown(
+            """
+            This application uses a trained Character-CNN
+            and Transformer architecture for CI/CD log
+            classification.
+
+            **Classification categories**
+
+            - Normal
+            - Flaky test
+            - Configuration drift
+            - Security anomaly
+            - Silent failure
+
+            Predictions are generated using neighbouring
+            log lines as context. Displayed scores are
+            not calibrated probabilities.
+            """
+        )
+
+    gr.Markdown(
+        """
+        <div class="footer-note">
+        CNN–Transformer CI/CD Log Classification Research Project
+        </div>
+        """,
+        elem_classes="footer-note"
+    )
+
 
 if __name__ == "__main__":
     # Render requires the service to bind to 0.0.0.0 and the PORT it provides.
