@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: cicd-log-anomaly-classifier
+    runtime: python
+    plan: free
+    buildCommand: pip install --no-cache-dir torch==2.8.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu && pip install --no-cache-dir -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: TORCH_NUM_THREADS
+        value: "1"
