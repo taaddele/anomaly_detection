@@ -901,12 +901,11 @@ def analyze_uploaded_or_pasted_log(pasted_text, uploaded_file):
 
 
 def submit_feedback(name, email, category, message):
-    """Save feedback locally and email it when SMTP environment variables exist."""
-    import smtplib
-    from email.message import EmailMessage
+    """Save feedback locally and send an email notification through Web3Forms."""
     message = (message or "").strip()
     if not message:
         return "Please enter a comment before submitting."
+
     feedback = {
         "submitted_at_utc": datetime.now(timezone.utc).isoformat(),
         "name": (name or "Anonymous").strip() or "Anonymous",
@@ -914,38 +913,101 @@ def submit_feedback(name, email, category, message):
         "category": category or "General comment",
         "message": message[:10000],
     }
+
+    # Keep a local copy where the service filesystem permits it. Render Free
+    # filesystems are ephemeral, so Web3Forms email is the durable delivery path.
+    saved_locally = False
+    local_save_note = ""
     feedback_path = BASE_DIR / "feedback.jsonl"
-    with feedback_path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(feedback, ensure_ascii=False) + "\n")
-    smtp_host = os.environ.get("SMTP_HOST")
-    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
-    smtp_user = os.environ.get("SMTP_USERNAME")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
-    feedback_to = os.environ.get("FEEDBACK_TO_EMAIL")
-    feedback_from = os.environ.get("FEEDBACK_FROM_EMAIL") or smtp_user
-    if not all([smtp_host, smtp_user, smtp_password, feedback_to, feedback_from]):
-        return ("Thank you. Your comment was saved by the app, but email delivery is not configured yet. "
-                "Add SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, FEEDBACK_TO_EMAIL, "
-                "and FEEDBACK_FROM_EMAIL in Render Environment settings to receive comments by email.")
-    mail = EmailMessage()
-    mail["Subject"] = f"CI/CD Classifier feedback: {feedback['category']}"
-    mail["From"] = feedback_from
-    mail["To"] = feedback_to
-    mail.set_content(
-        f"New feedback for the CI/CD Log Anomaly Classifier\n\n"
-        f"Name: {feedback['name']}\nEmail: {feedback['email'] or 'Not provided'}\n"
-        f"Category: {feedback['category']}\nSubmitted: {feedback['submitted_at_utc']}\n\n"
-        f"Comment:\n{feedback['message']}"
-    )
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(mail)
-        return "Thank you — your feedback has been submitted successfully."
+        with feedback_path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(feedback, ensure_ascii=False) + "\n")
+        saved_locally = True
+    except OSError as exc:
+        local_save_note = f" Local file backup was unavailable ({type(exc).__name__})."
+
+    access_key = (os.environ.get("WEB3FORMS_ACCESS_KEY") or "").strip()
+    if not access_key:
+        if saved_locally:
+            return ("Your comment was saved temporarily, but email delivery is not configured. "
+                    "Add the Render environment variable WEB3FORMS_ACCESS_KEY and redeploy. "
+                    "Render Free local files may be cleared when the service restarts.")
+        return ("Feedback could not be sent because WEB3FORMS_ACCESS_KEY is not configured. "
+                "Add it in Render Environment settings and redeploy." + local_save_note)
+
+    # Web3Forms accepts JSON submissions at this HTTPS endpoint. The access key
+    # is associated with the recipient email configured when the key was created.
+    payload = {
+        "access_key": access_key,
+        "from_name": "CI/CD Log Anomaly Research Dashboard",
+        "subject": f"CI/CD Classifier feedback: {feedback['category']}",
+        "name": feedback["name"],
+        "category": feedback["category"],
+        "submitted_at_utc": feedback["submitted_at_utc"],
+        "message": feedback["message"],
+    }
+    if feedback["email"]:
+        # Web3Forms uses the submitted email as the notification's Reply-To.
+        payload["email"] = feedback["email"]
+
+    request = urllib.request.Request(
+        "https://api.web3forms.com/submit",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            response_text = response.read().decode("utf-8", errors="replace")
+            result = json.loads(response_text) if response_text else {}
+
+        nested_body = result.get("body") if isinstance(result, dict) else None
+        api_success = (
+            isinstance(result, dict) and result.get("success") is True
+        ) or (
+            isinstance(nested_body, dict) and nested_body.get("success") is True
+        )
+
+        if api_success:
+            return "Thank you — your feedback has been emailed successfully." + local_save_note
+
+        detail = ""
+        if isinstance(result, dict):
+            detail = result.get("message") or result.get("error") or ""
+            if not detail and isinstance(nested_body, dict):
+                detail = nested_body.get("message") or ""
+        backup = " It was saved temporarily on the app." if saved_locally else ""
+        return ("Your comment was not accepted by Web3Forms. "
+                + (str(detail)[:300] if detail else "Check the access key and Web3Forms settings.")
+                + backup + local_save_note)
+
+    except urllib.error.HTTPError as exc:
+        error_text = exc.read().decode("utf-8", errors="replace")
+        try:
+            error_data = json.loads(error_text) if error_text else {}
+            detail = error_data.get("message") or error_data.get("error") or ""
+        except (json.JSONDecodeError, AttributeError):
+            detail = ""
+        backup = " Your comment was saved temporarily on the app." if saved_locally else ""
+        return (f"Web3Forms returned HTTP {exc.code}. "
+                + (str(detail)[:300] if detail else "Check your access key and Web3Forms settings.")
+                + backup + local_save_note)
+    except (urllib.error.URLError, TimeoutError) as exc:
+        backup = " Your comment was saved temporarily on the app." if saved_locally else ""
+        return ("The feedback email could not reach Web3Forms. Check network access and try again. "
+                f"({type(exc).__name__})" + backup + local_save_note)
+    except (json.JSONDecodeError, ValueError) as exc:
+        backup = " Your comment was saved temporarily on the app." if saved_locally else ""
+        return ("Web3Forms returned an unreadable response. Please try again. "
+                f"({type(exc).__name__})" + backup + local_save_note)
     except Exception as exc:
-        return ("Your comment was saved, but the email could not be sent. "
-                f"Check the SMTP settings in Render. ({type(exc).__name__})")
+        backup = " Your comment was saved temporarily on the app." if saved_locally else ""
+        return ("An unexpected error occurred while submitting feedback. "
+                f"({type(exc).__name__})" + backup + local_save_note)
 
 
 CUSTOM_CSS = r"""
@@ -1017,7 +1079,7 @@ with gr.Blocks(title="CI/CD Log Anomaly Research Dashboard", theme=gr.themes.Sof
             feedback_submit = gr.Button("Submit feedback", variant="primary")
             feedback_status = gr.Markdown()
             feedback_submit.click(fn=submit_feedback, inputs=[feedback_name, feedback_email, feedback_category, feedback_message], outputs=[feedback_status])
-            gr.Markdown("<span class='section-note'>Please do not include passwords, access tokens, private keys, or other sensitive information. Email delivery requires SMTP environment variables to be configured in Render.</span>")
+            gr.Markdown("<span class='section-note'>Feedback is emailed using Web3Forms. The app owner must configure WEB3FORMS_ACCESS_KEY in Render Environment settings. Please do not include passwords, access tokens, private keys, or confidential log data.</span>")
     gr.Markdown("<div style='text-align:center;color:#64748b;font-size:12px;padding:18px'>CI/CD Log Anomaly Research Dashboard · Developer: Taddele Petros</div>")
 
 if __name__ == "__main__":
