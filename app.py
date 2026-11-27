@@ -1010,77 +1010,208 @@ def submit_feedback(name, email, category, message):
                 f"({type(exc).__name__})" + backup + local_save_note)
 
 
-CUSTOM_CSS = r"""
-:root { --ink:#142238; --muted:#64748b; --line:#e2e8f0; --navy:#10233f; --blue:#2563eb; }
-.gradio-container { max-width: 1440px !important; background: #f4f7fb !important; font-family: Inter, ui-sans-serif, system-ui, sans-serif !important; }
-#hero { background: linear-gradient(120deg,#10233f 0%,#1c3c62 62%,#2563a6 100%); color:white; padding:30px 34px; border-radius:18px; margin-bottom:18px; }
-#hero h1 { color:white; font-size:30px; letter-spacing:-.7px; margin:4px 0 8px; }
-#hero p { color:#dbeafe; max-width:850px; margin:0; }
-.eyebrow { color:#93c5fd; font-size:11px; font-weight:800; letter-spacing:2px; }
-.kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:8px 0 18px; }
-.kpi { background:white; border:1px solid #e2e8f0; border-radius:13px; padding:17px 18px; box-shadow:0 3px 12px rgba(15,23,42,.04); }
-.kpi span { display:block; color:#64748b; font-size:10px; font-weight:800; letter-spacing:1.2px; }
-.kpi strong { display:block; color:#10233f; font-size:28px; margin:7px 0 2px; }
-.kpi small { color:#64748b; font-size:11px; }
-.empty-kpi { background:white; border:1px dashed #cbd5e1; border-radius:12px; padding:22px; color:#64748b; }
-button.primary { background:#1d4ed8 !important; }
-footer { display:none !important; }
-@media(max-width:760px){ .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));} #hero{padding:22px;} #hero h1{font-size:24px;} }
+
+# ---------------------------------------------------------
+# PROFESSIONAL GRADIO INTERFACE
+# ---------------------------------------------------------
+
+custom_css = """
+.gradio-container {
+    max-width: 1250px !important;
+    margin: auto !important;
+}
+
+#main-header {
+    text-align: center;
+    padding: 28px 20px;
+    border-radius: 14px;
+    margin-bottom: 18px;
+}
+
+#main-header h1 {
+    font-size: 30px;
+    font-weight: 750;
+}
+
+#main-header p {
+    font-size: 15px;
+}
+
+.panel {
+    border-radius: 14px !important;
+    padding: 18px !important;
+}
+
+#analyze-btn {
+    min-height: 48px;
+    font-weight: bold;
+}
+
+#clear-btn {
+    min-height: 48px;
+}
+
+.footer-note {
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.75;
+    margin-top: 20px;
+}
 """
 
-with gr.Blocks(title="CI/CD Log Anomaly Research Dashboard", theme=gr.themes.Soft(primary_hue="blue", neutral_hue="slate"), css=CUSTOM_CSS) as demo:
-    gr.HTML("""<section id="hero"><div class="eyebrow">RESEARCH PROTOTYPE · CI/CD OBSERVABILITY</div>
-      <h1>CI/CD Workflow Log Anomaly Dashboard</h1>
-      <p>Character-CNN + Transformer classification for line-level analysis of continuous integration and delivery logs. Upload a log or paste text to inspect model predictions and class distributions.</p></section>""")
-    with gr.Tabs():
-        with gr.Tab("Analysis dashboard"):
-            gr.Markdown("### Log analysis workspace\n<span class='section-note'>Upload a plain-text log or paste its contents. If both are supplied, the uploaded file is used.</span>")
-            with gr.Row(equal_height=True):
-                with gr.Column(scale=3):
-                    pasted_input = gr.Textbox(label="Paste CI/CD log", placeholder="Paste GitHub Actions or other CI/CD output here…", lines=12)
-                with gr.Column(scale=1):
-                    file_input = gr.File(label="Upload .txt log", file_types=[".txt"], type="filepath")
-                    analyze_button = gr.Button("Analyze workflow log", variant="primary", size="lg")
-                    clear_button = gr.ClearButton([pasted_input, file_input], value="Clear inputs")
-            gr.Markdown("### Prediction statistics")
-            stats_output = gr.HTML('<div class="empty-kpi">Run an analysis to see prediction statistics.</div>')
-            with gr.Row():
-                with gr.Column(scale=3):
-                    gr.Markdown("### Line-by-line prediction table")
-                    output_table = gr.Dataframe(headers=["Input line #", "Predicted class", "Top score (%)", "Decision", "Cleaned log text"], datatype=["number", "str", "number", "str", "str"], label="Predictions", interactive=False, wrap=True)
-                with gr.Column(scale=2):
-                    gr.Markdown("### Class distribution / confusion-style summary")
-                    class_table = gr.Dataframe(headers=["Class", "Lines", "Share (%)", "Type"], datatype=["str", "number", "number", "str"], interactive=False, label="Predicted class counts")
-                    summary_output = gr.Markdown(label="Model summary")
-            analyze_button.click(fn=analyze_uploaded_or_pasted_log, inputs=[pasted_input, file_input], outputs=[output_table, summary_output, stats_output, class_table])
-            gr.Markdown("**Interpretation note:** This is a predicted-class distribution, not a ground-truth confusion matrix. A true confusion matrix requires known labels for the submitted log. Softmax scores are not calibrated probabilities. Predictions are review signals, not proof of an incident. Avoid submitting passwords, access tokens, private keys, or confidential logs.")
-        with gr.Tab("Class guide"):
-            gr.Markdown("## Explanation of predicted classes\nThe labels below describe the five categories used by this research classifier. The model prediction should be reviewed in the context of the full workflow.")
-            class_explanations = [
-                ("Normal", "No anomaly category was predicted for the line. This does not guarantee that the complete workflow is free of problems."),
-                ("Flaky test", "A test-related instability pattern, such as inconsistent or intermittent test execution behavior."),
-                ("Configuration drift", "A possible mismatch or change in environment, dependency, build, or workflow configuration."),
-                ("Security anomaly", "A log pattern associated with a potential security-related issue, such as suspicious authentication or secret-handling behavior."),
-                ("Silent failure", "A possible failure pattern where execution does not produce a clear, conventional error signal."),
-            ]
-            for title, description in class_explanations:
-                gr.Markdown(f"### {title}\n{description}")
-        with gr.Tab("About"):
-            gr.Markdown("## About this research dashboard\nThis web application demonstrates line-level CI/CD workflow log classification using a Character-CNN + Transformer model. It is intended for research and exploratory analysis; it is not a replacement for operational monitoring or security incident response.")
-            gr.Markdown("### Developer\n**Taddele Petros**")
-            gr.Markdown("### Model limitations\n- Predictions depend on the training data and preprocessing pipeline.\n- Softmax scores are not calibrated probabilities.\n- A predicted class is not proof of a real-world incident.\n- Similar log lines and surrounding context can affect predictions.")
-        with gr.Tab("Feedback & comments"):
-            gr.Markdown("## Share feedback\nReport a problem, suggest an improvement, or leave a comment about the research dashboard.")
-            with gr.Row():
-                feedback_name = gr.Textbox(label="Name (optional)", placeholder="Your name")
-                feedback_email = gr.Textbox(label="Email (optional)", placeholder="you@example.com")
-            feedback_category = gr.Dropdown(["General comment", "Prediction issue", "Interface issue", "Research question", "Feature suggestion"], value="General comment", label="Feedback category")
-            feedback_message = gr.Textbox(label="Your comment", placeholder="Write your feedback here…", lines=6, max_lines=12)
-            feedback_submit = gr.Button("Submit feedback", variant="primary")
-            feedback_status = gr.Markdown()
-            feedback_submit.click(fn=submit_feedback, inputs=[feedback_name, feedback_email, feedback_category, feedback_message], outputs=[feedback_status])
-            gr.Markdown("<span class='section-note'>Feedback is emailed using Web3Forms. The app owner must configure WEB3FORMS_ACCESS_KEY in Render Environment settings. Please do not include passwords, access tokens, private keys, or confidential log data.</span>")
-    gr.Markdown("<div style='text-align:center;color:#64748b;font-size:12px;padding:18px'>CI/CD Log Anomaly Research Dashboard · Developer: Taddele Petros</div>")
+with gr.Blocks(
+    theme=gr.themes.Soft(
+        primary_hue="blue",
+        secondary_hue="slate",
+        neutral_hue="slate"
+    ),
+    css=custom_css,
+    title="CI/CD Intelligent Log Analyzer"
+) as demo:
+
+    # Header
+    gr.Markdown(
+        """
+        # CI/CD Intelligent Log Analyzer
+
+        **CNN–Transformer Based Log Classification System**
+
+        Analyze continuous integration and continuous
+        deployment logs to identify normal behavior,
+        flaky tests, configuration drift, security anomalies,
+        and silent failures.
+        """,
+        elem_id="main-header"
+    )
+
+    gr.Markdown("## 1. Upload or enter your workflow logs")
+
+    with gr.Row():
+
+        with gr.Column(scale=2, elem_classes="panel"):
+            pasted_input = gr.Textbox(
+                label="Paste CI/CD workflow logs",
+                placeholder=(
+                    "Initialize workflow\n"
+                    "Installing dependencies\n"
+                    "Running unit tests\n"
+                    "Error: Connection timeout\n"
+                    "Build failed"
+                ),
+                lines=16
+            )
+
+        with gr.Column(scale=1, elem_classes="panel"):
+            file_input = gr.File(
+                label="Upload log file (.txt)",
+                file_types=[".txt"],
+                type="filepath"
+            )
+
+            gr.Markdown(
+                """
+                **Supported input**
+
+                - GitHub Actions logs
+                - CI/CD workflow logs
+                - Plain-text `.txt` files
+
+                Uploaded files take priority over pasted text.
+                """
+            )
+
+    with gr.Row():
+        analyze_button = gr.Button(
+            "Analyze workflow logs",
+            variant="primary",
+            elem_id="analyze-btn"
+        )
+
+        clear_button = gr.Button(
+            "Clear",
+            variant="secondary",
+            elem_id="clear-btn"
+        )
+
+    gr.Markdown("---")
+
+    gr.Markdown("## 2. Classification results")
+
+    summary_output = gr.Markdown(
+        label="Analysis summary"
+    )
+
+    output_table = gr.Dataframe(
+        headers=[
+            "Input line #",
+            "Predicted class",
+            "Top score (%)",
+            "Decision",
+            "Cleaned log text"
+        ],
+        datatype=[
+            "number",
+            "str",
+            "number",
+            "str",
+            "str"
+        ],
+        label="Line-by-line classification",
+        interactive=False,
+        wrap=True
+    )
+
+    # Existing trained-model prediction callback
+    analyze_button.click(
+        fn=analyze_uploaded_or_pasted_log,
+        inputs=[pasted_input, file_input],
+        outputs=[output_table, summary_output]
+    )
+
+    # Clear input and previous results
+    clear_button.click(
+        fn=lambda: ("", None, [], ""),
+        inputs=[],
+        outputs=[
+            pasted_input,
+            file_input,
+            output_table,
+            summary_output
+        ]
+    )
+
+    with gr.Accordion(
+        "About the classification system",
+        open=False
+    ):
+        gr.Markdown(
+            """
+            This application uses a trained Character-CNN
+            and Transformer architecture for CI/CD log
+            classification.
+
+            **Classification categories**
+
+            - Normal
+            - Flaky test
+            - Configuration drift
+            - Security anomaly
+            - Silent failure
+
+            Predictions are generated using neighbouring
+            log lines as context. Displayed scores are
+            not calibrated probabilities.
+            """
+        )
+
+    gr.Markdown(
+        """
+        <div class="footer-note">
+        CNN–Transformer CI/CD Log Classification Research Project
+        </div>
+        """,
+        elem_classes="footer-note"
+    )
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "10000"))
