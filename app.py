@@ -1057,6 +1057,9 @@ custom_css = """
     opacity: 0.75;
     margin-top: 20px;
 }
+#developer{
+font-weight:800px
+}
 /* Hide only Gradio's default footer */
 footer {
     display: none !important;
@@ -1212,6 +1215,9 @@ with gr.Blocks(
         """
         <div class="footer-note">
         CNN–Transformer CI/CD Log Classification Research Project
+        </div>
+        <div class="footer-note" id="developer">
+        Developed By: Taddele Petros (Software Engineer)
         </div>
         """,
         elem_classes="footer-note"
