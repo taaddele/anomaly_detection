@@ -1057,6 +1057,10 @@ custom_css = """
     opacity: 0.75;
     margin-top: 20px;
 }
+/* Hide only Gradio's default footer */
+footer {
+    display: none !important;
+}
 """
 
 with gr.Blocks(
